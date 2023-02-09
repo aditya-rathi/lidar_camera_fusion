@@ -2,7 +2,8 @@
     "python.autoComplete.extraPaths": [
         "/home/cerlab/submodule_ws/devel/lib/python3/dist-packages",
         "/home/cerlab/natnet_ws/devel/lib/python3/dist-packages",
-        "/opt/ros/noetic/lib/python3/dist-packages"
+        "/opt/ros/noetic/lib/python3/dist-packages",
+        "/home/cerlab/submodule_ws/src/lidar_camera_fusion/include"
     ],
     "python.analysis.extraPaths": [
         "/home/cerlab/submodule_ws/devel/lib/python3/dist-packages",
