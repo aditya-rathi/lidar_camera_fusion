@@ -1,0 +1,29 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "${default}",
+        "limitSymbolsToIncludedHeaders": false
+      },
+      "includePath": [
+        "/home/cerlab/submodule_ws/devel/include/**",
+        "/opt/ros/noetic/include/**",
+        "/home/cerlab/natnet_ws/devel/include/**",
+        "/home/cerlab/submodule_ws/src/custom_costmap_layer/include/**",
+        "/home/cerlab/submodule_ws/src/darknet_ros/darknet_ros/include/**",
+        "/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/**",
+        "/home/cerlab/submodule_ws/src/map_maker/include/**",
+        "/home/cerlab/submodule_ws/src/ouster_ros/include/**",
+        "/home/cerlab/submodule_ws/src/segment_pointcloud/include/**",
+        "/home/cerlab/submodule_ws/src/yolov7_ros/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS",
+      "intelliSenseMode": "gcc-x64",
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "gnu11",
+      "cppStandard": "c++14"
+    }
+  ],
+  "version": 4
+}

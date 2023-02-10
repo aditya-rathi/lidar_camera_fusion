@@ -1,41 +1,32 @@
-#!/home/cerlab/.pyenv/versions/3.6.15/envs/lccnet/bin python3
+#!usr/bin/env python3
 
 import csv
 import random
-import open3d as o3
+# import open3d as o3
 
 import cv2
-import mathutils
+# import mathutils
 # import matplotlib
 # matplotlib.use('Qt5Agg')
 import os
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as pltk
 import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.nn.parallel
-import torch.utils.data
-from sacred import Experiment
-from sacred.utils import apply_backspaces_and_linefeeds
-from skimage import io
-from tqdm import tqdm
-import time
 
 
-from LCCNet.models.LCCNet import LCCNet
 
-from quaternion_distances import quaternion_distance
-from utils import (mat2xyzrpy, merge_inputs, overlay_imgs, quat2mat,
+from models.LCCNet import LCCNet
+
+# from quaternion_distances import quaternion_distance
+from lidar_camera_fusion.utils import (mat2xyzrpy, merge_inputs, overlay_imgs, quat2mat,
                    quaternion_from_matrix, rotate_back, rotate_forward,
                    tvector2mat)
 
-from torch.utils.data import Dataset
-from pykitti import odometry
-import pandas as pd
+
 from PIL import Image as im
-from math import radians
-from utils import invert_pose
-from torchvision import transforms
+
 
 import rospy
 import tf2_ros
@@ -78,11 +69,11 @@ class lidar_cam:
     def __init__(self):
         tfBuffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(tfBuffer)
-        self.sub1 = rospy.Subscriber("/theia/left_camera/color/image_raw",Image,self.cam_callback)
+        self.sub1 = rospy.Subscriber("/theia/right_camera/color/image_raw",Image,self.cam_callback)
         self.sub2 = rospy.Subscriber("/theia/os_cloud_node/points",PointCloud2,self.lidar_callback)
         self.sub3 = rospy.Subscriber
-        self.image = np.array()
-        self.pcl_arr = np.array()
+        self.image = im.Image()
+        self.pcl_arr = []
         self.cam_intrinsic = np.array([[615.3355712890625, 0.0, 333.37738037109375], [0.0, 615.457763671875, 233.50408935546875], [0.0, 0.0, 1.0]])
         self.main()
     
@@ -97,17 +88,18 @@ class lidar_cam:
         input_size = (256, 512)
     
         weights = [
-            'home/cerlab/submodule_ws/src/lidar_camera_fusion/include/LCCNet/pretrained/kitti_iter1.tar',
-            'home/cerlab/submodule_ws/src/lidar_camera_fusion/include/LCCNet/pretrained/kitti_iter2.tar',
-            'home/cerlab/submodule_ws/src/lidar_camera_fusion/include/LCCNet/pretrained/kitti_iter3.tar',
-            'home/cerlab/submodule_ws/src/lidar_camera_fusion/include/LCCNet/pretrained/kitti_iter4.tar',
-            'home/cerlab/submodule_ws/src/lidar_camera_fusion/include/LCCNet/pretrained/kitti_iter5.tar'
+            '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/LCCNet/pretrained/kitti_iter1.tar',
+            '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/LCCNet/pretrained/kitti_iter2.tar',
+            '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/LCCNet/pretrained/kitti_iter3.tar',
+            '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/LCCNet/pretrained/kitti_iter4.tar',
+            '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/LCCNet/pretrained/kitti_iter5.tar'
         ]
 
         models = []
 
         for i in range(len(weights)):
-            model = LCCNet(input_size, use_feat_from=-1, md=4,
+            print(i)
+            model = LCCNet(input_size, use_feat_from=1, md=4,
                                 use_reflectance=False, dropout=0.0)
             checkpoint = torch.load(weights[i], map_location='cpu')
             saved_state_dict = checkpoint['state_dict']
@@ -116,15 +108,38 @@ class lidar_cam:
             model.eval()
             models.append(model)
 
-        rgb_resize = 
+        print('here')
+
+        real_shape = [self.image.shape[1],self.image.shape[2],self.image.shape[0]]
+        depth_img,_,_ = lidar_project_depth(self.pcl_arr, self.cam_intrinsic, real_shape)
+        depth_img = (depth_img / np.max(depth_img)) * 255
+        rgb_resize = F.interpolate(self.image, size=[256, 512], mode="bilinear")
+        rgb_resize.to(device)
+
+        RTs = []
         
         for iteration in range(len(weights)):
+            lidar_resize = F.interpolate(depth_img, size=[256, 512], mode="bilinear")
+            lidar_resize.to(device)
             T_predicted, R_predicted = models[iteration](rgb_resize, lidar_resize)
+            RT_predicted = torch.mm(T_predicted, R_predicted)
+            if iteration == 0:
+                    rotated_point_cloud = self.pcl_arr
+            rotated_point_cloud = rotate_forward(rotated_point_cloud, RT_predicted)
+            RTs.append(RT_predicted)
+            depth_img,_,_ = lidar_project_depth(rotated_point_cloud, self.cam_intrinsic, real_shape)
+        
+        depth_img.save('final_depth.png')
+        self.image.save('rgb.png')
+        
+        print(RTs)
 
 
 
 
 
-def main():
+
+if __name__=='__main__':
     rospy.init_node('cam_lidar_transform')
+    my_transformer = lidar_cam()
     
