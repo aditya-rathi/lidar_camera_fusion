@@ -27,7 +27,7 @@ from lidar_camera_fusion.utils import (mat2xyzrpy, merge_inputs, overlay_imgs, q
 
 from PIL import Image as im
 
-
+from torchvision import transforms
 import rospy
 import tf2_ros
 import pcl_ros
@@ -71,18 +71,24 @@ class lidar_cam:
         self.tf_listener = tf2_ros.TransformListener(tfBuffer)
         self.sub1 = rospy.Subscriber("/theia/right_camera/color/image_raw",Image,self.cam_callback)
         self.sub2 = rospy.Subscriber("/theia/os_cloud_node/points",PointCloud2,self.lidar_callback)
-        self.sub3 = rospy.Subscriber
         self.image = im.Image()
         self.pcl_arr = []
         self.cam_intrinsic = np.array([[615.3355712890625, 0.0, 333.37738037109375], [0.0, 615.457763671875, 233.50408935546875], [0.0, 0.0, 1.0]])
+        self.to_tensor = transforms.ToTensor()
+        self.normalization = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                             std=[0.229, 0.224, 0.225])
         self.main()
     
     def cam_callback(self,data):
         data = ros_numpy.numpify(data)
         self.image = im.fromarray(data)
+        self.sub1.unregister()
  
     def lidar_callback(self,data):
-        self.pcl_arr = ros_numpy.numpify(data)
+        self.pcl_arr = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(data,remove_nans=True)
+        self.pcl_arr = torch.from_numpy(self.pcl_arr.astype(np.float32))
+        self.pcl_arr = self.pcl_arr.cuda()
+        self.sub2.unregister()
     
     def main(self):
         input_size = (256, 512)
@@ -109,18 +115,24 @@ class lidar_cam:
             models.append(model)
 
         print('here')
-
-        real_shape = [self.image.shape[1],self.image.shape[2],self.image.shape[0]]
+        real_shape = np.array(self.image).shape
+        real_shape = [real_shape[1],real_shape[2],real_shape[0]]
         depth_img,_,_ = lidar_project_depth(self.pcl_arr, self.cam_intrinsic, real_shape)
-        depth_img = (depth_img / np.max(depth_img)) * 255
+        depth_img = torch.unsqueeze(depth_img,0)
+        # depth_img = depth_img.detach().cpu().numpy()
+        # depth_img = (depth_img / np.max(depth_img)) * 255
+        self.image.save('rgb.png')
+        self.image = self.to_tensor(self.image)
+        self.image = self.normalization(self.image)
+        self.image = torch.unsqueeze(self.image,0)
         rgb_resize = F.interpolate(self.image, size=[256, 512], mode="bilinear")
-        rgb_resize.to(device)
+        rgb_resize = rgb_resize.to(device)
 
         RTs = []
         
         for iteration in range(len(weights)):
             lidar_resize = F.interpolate(depth_img, size=[256, 512], mode="bilinear")
-            lidar_resize.to(device)
+            lidar_resize = lidar_resize.to(device)
             T_predicted, R_predicted = models[iteration](rgb_resize, lidar_resize)
             RT_predicted = torch.mm(T_predicted, R_predicted)
             if iteration == 0:
@@ -128,9 +140,12 @@ class lidar_cam:
             rotated_point_cloud = rotate_forward(rotated_point_cloud, RT_predicted)
             RTs.append(RT_predicted)
             depth_img,_,_ = lidar_project_depth(rotated_point_cloud, self.cam_intrinsic, real_shape)
+            depth_img = torch.unsqueeze(depth_img,dim=0)
+            # depth_img = depth_img.detach().cpu().numpy()
+            # depth_img = (depth_img / np.max(depth_img)) * 255
         
         depth_img.save('final_depth.png')
-        self.image.save('rgb.png')
+        
         
         print(RTs)
 
