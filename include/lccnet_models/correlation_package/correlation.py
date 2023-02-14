@@ -18,7 +18,7 @@ class CorrelationFunction(Function):
 
     @staticmethod
     def forward(ctx, self, input1, input2):
-        ctx.save_for_backward(self, input1, input2)
+        ctx.save_for_backward(input1, input2)
 
         with torch.cuda.device_of(input1):
             rbot1 = input1.new()
