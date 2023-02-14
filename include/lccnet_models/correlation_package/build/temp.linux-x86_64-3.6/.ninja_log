@@ -1,0 +1,3 @@
+# ninja log v5
+0	11904	1676340723995680684	/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lccnet_models/correlation_package/build/temp.linux-x86_64-3.6/correlation_cuda_kernel.o	b667770c0cb1ceeb
+0	13970	1676340726059702210	/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lccnet_models/correlation_package/build/temp.linux-x86_64-3.6/correlation_cuda.o	bece2b75386a7478

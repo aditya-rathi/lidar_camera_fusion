@@ -8,3 +8,5 @@ include/models/__pycache__/
 include/models/correlation_package/__pycache__/
 
 include/models/correlation_package/build/temp.linux-x86_64-3.6/
+
+include/lidar_camera_fusion/pretrained/

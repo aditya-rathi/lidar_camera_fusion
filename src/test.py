@@ -17,7 +17,7 @@ import torch.nn.parallel
 
 
 
-from models.LCCNet import LCCNet
+from lccnet_models.LCCNet import LCCNet
 
 # from quaternion_distances import quaternion_distance
 from lidar_camera_fusion.utils import (mat2xyzrpy, merge_inputs, overlay_imgs, quat2mat,
@@ -94,11 +94,11 @@ class lidar_cam:
         input_size = (256, 512)
     
         weights = [
-            '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/LCCNet/pretrained/kitti_iter1.tar',
-            '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/LCCNet/pretrained/kitti_iter2.tar',
-            '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/LCCNet/pretrained/kitti_iter3.tar',
-            '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/LCCNet/pretrained/kitti_iter4.tar',
-            '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/LCCNet/pretrained/kitti_iter5.tar'
+            '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter1.tar',
+            '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter2.tar',
+            '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter3.tar',
+            '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter4.tar',
+            '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter5.tar'
         ]
 
         models = []
