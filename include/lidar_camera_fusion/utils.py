@@ -269,7 +269,7 @@ def overlay_imgs(rgb, lidar, idx=0):
     std = [0.229, 0.224, 0.225]
     mean = [0.485, 0.456, 0.406]
 
-    rgb = rgb.clone().cpu().permute(1,2,0).numpy()
+    rgb = rgb.clone().cpu().permute(2,1,0).numpy()
     rgb = rgb*std+mean
     lidar = lidar.clone()
 
@@ -291,7 +291,7 @@ def overlay_imgs(rgb, lidar, idx=0):
     blended_img = blended_img.clip(min=0., max=1.)
     #io.imshow(blended_img)
     #io.show()
-    #plt.figure()
-    #plt.imshow(blended_img)
-    #io.imsave(f'./IMGS/{idx:06d}.png', blended_img)
+    # plt.figure()
+    # plt.imshow(blended_img)
+    # io.imsave(f'./IMGS/{idx:06d}.png', blended_img)
     return blended_img

@@ -71,6 +71,7 @@ class lidar_cam:
         tfBuffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(tfBuffer)
         self.sub1 = rospy.Subscriber("/theia/right_camera/color/image_raw",Image,self.cam_callback)
+        # self.sub1 = rospy.Subscriber("camera/color/image_raw",Image,self.cam_callback)
         self.sub2 = rospy.Subscriber("/theia/os_cloud_node/points",PointCloud2,self.lidar_callback)
         self.image = None
         self.pcl_arr = None
@@ -123,7 +124,11 @@ class lidar_cam:
         # print(self.image)
         real_shape = np.array(self.image).shape
         # print(real_shape)
-        real_shape = [real_shape[0],real_shape[1],real_shape[2]]
+        real_shape = [real_shape[1],real_shape[0],real_shape[2]] #!!Needs verification!!
+
+        RT_INIT = torch.tensor([[0, 1, 0 , 0], [-1, 0, 0, 0],[0, 0, 1, 0],[0, 0, 0, 1]],dtype=torch.float).cuda()
+        rotated_point_cloud = rotate_forward(self.pcl_arr, RT_INIT)
+
         depth_img,_,_ = lidar_project_depth(self.pcl_arr, self.cam_intrinsic, real_shape)
         # print(depth_img.shape)
         depth_img = torch.unsqueeze(depth_img,0)
@@ -138,37 +143,48 @@ class lidar_cam:
 
         RTs = []
         
-        for iteration in range(len(weights)):
-            lidar_resize = F.interpolate(depth_img, size=[256, 512], mode="bilinear")
-            lidar_resize = lidar_resize.to(device)
-            T_predicted, R_predicted = models[iteration](rgb_resize, lidar_resize)
-            R_predicted = quat2mat(R_predicted[0])
-            T_predicted = tvector2mat(T_predicted[0])
-            RT_predicted = torch.mm(T_predicted, R_predicted)
-            if iteration == 0:
-                    rotated_point_cloud = self.pcl_arr
-            rotated_point_cloud = rotate_forward(rotated_point_cloud, RT_predicted)
-            RTs.append(RT_predicted.detach().cpu().numpy())
-            depth_img,_,_ = lidar_project_depth(rotated_point_cloud, self.cam_intrinsic, real_shape)
-            depth_img = torch.unsqueeze(depth_img,dim=0)
+        with torch.no_grad():
+            for iteration in range(len(weights)):
+                lidar_resize = F.interpolate(depth_img, size=[256, 512], mode="bilinear")
+                lidar_resize = lidar_resize.to(device)
+                T_predicted, R_predicted = models[iteration](rgb_resize, lidar_resize)
+                R_predicted = quat2mat(R_predicted[0])
+                T_predicted = tvector2mat(T_predicted[0])
+                RT_predicted = torch.mm(T_predicted, R_predicted)                    
+                rotated_point_cloud = rotate_forward(rotated_point_cloud, RT_predicted)
+                RTs.append(RT_predicted.detach().cpu().numpy())
+                depth_img,_,_ = lidar_project_depth(rotated_point_cloud, self.cam_intrinsic, real_shape)
+                depth_img = torch.unsqueeze(depth_img,dim=0)
             # 
-        
+        combined = overlay_imgs(self.image[0],depth_img)
+        combined = combined.astype(np.uint8)
+        print(combined)
+        cv2.imwrite('combined.png',combined)
         depth_img = F.interpolate(depth_img, size=[256, 512], mode="bilinear")
         depth_img = depth_img.squeeze()
         
         depth_img = depth_img.detach().cpu().numpy()
-        depth_img = (depth_img / np.max(depth_img)) * 255
+        depth_img = ((depth_img / np.max(depth_img)) * 255)
+        # depth_img = cv2.applyColorMap(depth_img,cv2.COLORMAP_JET)
         depth_img = im.fromarray(depth_img)
         depth_img = depth_img.convert('RGB')
         depth_img.save('final_depth.png')
+
+        
         
         pcl_pred = o3.geometry.PointCloud()
         rotated_point_cloud = (rotated_point_cloud.T).detach().cpu().numpy()
+
+        color_arr_0 = np.hstack((np.zeros((rotated_point_cloud.shape[0],2),dtype=np.float64),np.ones((rotated_point_cloud.shape[0],1),dtype=np.float64)))
+        color_arr_1 = np.hstack((np.ones((rotated_point_cloud.shape[0],1),dtype=np.float64),np.zeros((rotated_point_cloud.shape[0],2),dtype=np.float64)))
+        points_arr = np.concatenate((self.pcl_arr.cpu().numpy().T,rotated_point_cloud))
+        color_arr = np.concatenate((color_arr_0,color_arr_1))
         
-        pcl_pred.points = o3.utility.Vector3dVector(rotated_point_cloud[:, :3])
+        pcl_pred.points = o3.utility.Vector3dVector(points_arr[:, :3])
+        pcl_pred.colors = o3.utility.Vector3dVector(color_arr)
         o3.io.write_point_cloud('test.pcd',pcl_pred)
         
-        print(RTs)
+        # rvizprint(RTs)
 
 
 
