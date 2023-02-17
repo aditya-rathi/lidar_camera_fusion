@@ -6,11 +6,14 @@ import pcl_ros
 from sensor_msgs.msg import Image, PointCloud2
 import ros_numpy
 import numpy as np
+import cv2
+from cv_bridge import CvBridge
 
 class pc_project:
     def __init__(self):
         self.sub1 = rospy.Subscriber("/theia/right_camera/color/image_raw",Image,self.cam_callback)
         self.sub2 = rospy.Subscriber("/theia/os_cloud_node/points",PointCloud2,self.lidar_callback)
+        self.pub1 = rospy.Publisher('/combined_output',Image)
         self.image = None
         self.pcl_arr = None
         self.cam_intrinsic = np.array([[615.3355712890625, 0.0, 333.37738037109375], [0.0, 615.457763671875, 233.50408935546875], [0.0, 0.0, 1.0]])
@@ -35,10 +38,32 @@ class pc_project:
                             [ 0.0058403 ,  1.        ,  0.0010519 ,  0.03430176],
                             [-0.00870514, -0.00100136,  1.        ,  0.03448486],
                             [ 0.        ,  0.        ,  0.        ,  1.        ]],dtype=np.float32)
+        self.bridge = CvBridge()
 
     def cam_callback(self,data):
-        data = ros_numpy.numpify(data)
+        self.image = ros_numpy.numpify(data)
         
  
     def lidar_callback(self,data):
         self.pcl_arr = ros_numpy.point_cloud2.pointcloud2_to_xyz_array(data,remove_nans=True)
+
+    def project_depth(self):
+        img_shape = self.image.shape
+        pcl_xyz = self.cam_intrinsic @ self.pcl_arr.T
+        pcl_xyz = pcl_xyz.T
+        pcl_z = pcl_xyz[:, 2]
+        pcl_xyz = pcl_xyz / (pcl_xyz[:, 2, None] + 1e-10)
+        pcl_uv = pcl_xyz[:, :2]
+        mask = (pcl_uv[:, 0] > 0) & (pcl_uv[:, 0] < img_shape[0]) & (pcl_uv[:, 1] > 0) & (
+            pcl_uv[:, 1] < img_shape[1]) & (pcl_z > 0)
+        pcl_uv = pcl_uv[mask]
+        pcl_z = pcl_z[mask]
+        pcl_uv = pcl_uv.astype(np.uint32)
+        pcl_z = pcl_z.reshape(-1, 1)
+        depth_img = np.zeros((img_shape[0], img_shape[1], 1))
+        depth_img[pcl_uv[:, 1], pcl_uv[:, 0]] = pcl_z
+        depth_img = ((depth_img/np.max(depth_img))*255).astype(np.uint8)
+        depth_img = cv2.applyColorMap(depth_img,cv2.COLORMAP_JET)
+        output_img = cv2.addWeighted(self.image,0.8,depth_img,0.2,0)
+        self.pub1.publish(self.bridge.cv2_to_imgmsg(output_img,encoding="passthrough"))
+
