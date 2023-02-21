@@ -95,8 +95,9 @@ class lidar_cam:
         self.sub2.unregister()
     
     def main(self):
-        # while(self.image==None and self.pcl_arr==None):
-        #     rospy.sleep(1)
+        while(self.image==None or self.pcl_arr==None):
+            print("waiting")
+            rospy.sleep(1)
         # print(self.image)
         input_size = (256, 512)
     
@@ -126,7 +127,7 @@ class lidar_cam:
         # print(real_shape)
         real_shape = [real_shape[1],real_shape[0],real_shape[2]] #!!Needs verification!!
 
-        RT_INIT = torch.tensor([[0, 1, 0 , 0], [-1, 0, 0, 0],[0, 0, 1, 0],[0, 0, 0, 1]],dtype=torch.float).cuda()
+        RT_INIT = torch.tensor([[0, 1, 0 , 0], [-1, 0, 0, 0],[0, 0, 1, 0],[0, -0.1778, -0.381, 1]],dtype=torch.float).cuda()
         rotated_point_cloud = rotate_forward(self.pcl_arr, RT_INIT)
 
         depth_img,_,_ = lidar_project_depth(self.pcl_arr, self.cam_intrinsic, real_shape)
@@ -184,7 +185,7 @@ class lidar_cam:
         pcl_pred.colors = o3.utility.Vector3dVector(color_arr)
         o3.io.write_point_cloud('test.pcd',pcl_pred)
         
-        # rvizprint(RTs)
+        print(RTs)
 
 
 
