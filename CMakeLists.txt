@@ -174,6 +174,7 @@ add_definitions(${PCL_DEFINITIONS})
 catkin_install_python(PROGRAMS
   src/test.py
   src/pc_project.py
+  src/main.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
