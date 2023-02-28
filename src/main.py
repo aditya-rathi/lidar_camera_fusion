@@ -71,8 +71,7 @@ DUMMY_FIELD_PREFIX = '__'
 def lidar_project_depth(pc_rotated,pc_data,img_shape):
     pc_rotated = pc_rotated[:3,:].detach().cpu().numpy()
     pc_rotated = pc_rotated.T
-    depth_img = np.zeros((32,1024,1),dtype=np.float32)
-    i=0
+    depth_img = np.zeros((128,1024,1),dtype=np.float32)
     for point in pc_rotated:
         range = np.linalg.norm(point)
         if range>0:
@@ -81,20 +80,19 @@ def lidar_project_depth(pc_rotated,pc_data,img_shape):
             u = 0.5 * (yaw / math.pi + 1.0)
             v = 1.0 - (pitch + math.pi/2) / math.pi
             u = int(np.floor(u*1024))
-            v = int(np.floor(v*32))
-            print(u,v)
+            v = int(np.floor(v*127))
+            # print(u,v)
             # u = int(np.clip(u,0.0,1023))
             # v = int(np.clip(v,0.0,31))
-            if(u>=0 and u<1024 and v>=0 and v<32):
-                depth_img[v,u] = pc_data[i]
-        i=i+1
+            if(u>=0 and u<1024 and v>=0 and v<127):
+                depth_img[v,u] = range+255
     temp = np.clip(depth_img,0,255).astype(np.uint8)#(depth_img/np.max(depth_img) * 255).astype(np.uint8)
     temp = cv2.resize(temp,(1024,480),interpolation=cv2.INTER_CUBIC)
+    cv2.namedWindow('temp',cv2.WINDOW_NORMAL)
     cv2.imshow('temp',temp)
     cv2.waitKey(0)
 
-    depth_img = depth_img[5:25,410:640]
-    depth_img = cv2.flip(depth_img,1)
+    depth_img = depth_img[20:100,410:640]
     
     depth_img = torch.from_numpy(depth_img.astype(np.float32))
     depth_img = depth_img.cuda()
@@ -108,7 +106,7 @@ class lidar_cam:
         self.tf_listener = tf2_ros.TransformListener(tfBuffer)
         self.sub1 = rospy.Subscriber("/theia/right_camera/color/image_raw",Image,self.cam_callback)
         # self.sub1 = rospy.Subscriber("camera/color/image_raw",Image,self.cam_callback)
-        self.sub2 = rospy.Subscriber("/theia/os_cloud_node/points",PointCloud2,self.lidar_callback)
+        self.sub2 = rospy.Subscriber("/pc_interpoled",PointCloud2,self.lidar_callback)
         self.image = None
         self.pcl_arr = None
         self.cam_intrinsic = np.array([[615.3355712890625, 0.0, 333.37738037109375], [0.0, 615.457763671875, 233.50408935546875], [0.0, 0.0, 1.0]])
@@ -125,10 +123,11 @@ class lidar_cam:
  
     def lidar_callback(self,data:PointCloud2):
         cloud_arr = ros_numpy.point_cloud2.pointcloud2_to_array(data)
+        print(cloud_arr.shape)
         mask = np.isfinite(cloud_arr['x']) & np.isfinite(cloud_arr['y']) & np.isfinite(cloud_arr['z'])
         cloud_arr = cloud_arr[mask]
-        self.pcl_data = np.zeros(cloud_arr.shape + (1,), dtype=np.uint16)
-        self.pcl_data[...,0] = cloud_arr['intensity']
+        # self.pcl_data = np.zeros(cloud_arr.shape + (1,), dtype=np.uint16)
+        # self.pcl_data[...,0] = cloud_arr['intensity']
 
         self.pcl_arr = ros_numpy.point_cloud2.get_xyz_points(cloud_arr)
         self.pcl_arr = np.hstack((self.pcl_arr,np.ones((self.pcl_arr.shape[0],1))))
@@ -141,12 +140,20 @@ class lidar_cam:
         # print(self.image)
         input_size = (256, 512)
     
+        # weights = [
+        #     '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter1.tar',
+        #     '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter2.tar',
+        #     '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter3.tar',
+        #     '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter4.tar',
+        #     '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter5.tar'
+        # ]
+
         weights = [
-            '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter1.tar',
-            '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter2.tar',
-            '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter3.tar',
-            '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter4.tar',
-            '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter5.tar'
+            '/home/cerlab-ugv/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter1.tar',
+            '/home/cerlab-ugv/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter2.tar',
+            '/home/cerlab-ugv/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter3.tar',
+            '/home/cerlab-ugv/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter4.tar',
+            '/home/cerlab-ugv/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter5.tar'
         ]
 
         models = []
@@ -174,7 +181,7 @@ class lidar_cam:
         RT_INIT = torch.tensor([[0, 1, 0 , 0], [-1, 0, 0, 0],[0, 0, 1, 0],[0, -0.1778, -0.381, 1]],dtype=torch.float).cuda()
         rotated_point_cloud = rotate_forward(self.pcl_arr, RT_INIT)
 
-        depth_img,_,_ = lidar_project_depth(rotated_point_cloud, self.pcl_data, real_shape)
+        depth_img,_,_ = lidar_project_depth(rotated_point_cloud, self.cam_intrinsic, real_shape)
         # print(depth_img.shape)
         depth_img = torch.unsqueeze(depth_img,0)
         # depth_img = depth_img.detach().cpu().numpy()
@@ -198,7 +205,7 @@ class lidar_cam:
                 RT_predicted = torch.mm(T_predicted, R_predicted)                    
                 rotated_point_cloud = rotate_forward(rotated_point_cloud, RT_predicted)
                 RTs.append(RT_predicted.detach().cpu().numpy())
-                depth_img,_,_ = lidar_project_depth(rotated_point_cloud, self.pcl_data, real_shape)
+                depth_img,_,_ = lidar_project_depth(rotated_point_cloud, self.cam_intrinsic, real_shape)
                 depth_img = torch.unsqueeze(depth_img,dim=0)
             # 
         # combined = overlay_imgs(self.image[0],depth_img)
