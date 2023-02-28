@@ -10,6 +10,8 @@ import cv2
 from cv_bridge import CvBridge
 import threading
 
+flag = True
+
 class pc_project:
     def __init__(self):
         self.sub1 = rospy.Subscriber("/theia/right_camera/color/image_raw",Image,self.cam_callback)
@@ -66,12 +68,11 @@ class pc_project:
         self.pcl_arr = data[:,:3]
         self.lock.release()
 
-
     def project_depth(self):
+        global flag
         while self.image is None or self.pcl_arr is None:
             rospy.sleep(0.1)
         img_shape = self.image.shape
-        print(self.pcl_arr.T.shape)
         self.lock.acquire()
         pcl_xyz = self.cam_intrinsic @ self.pcl_arr.T
         self.lock.release()
@@ -79,6 +80,16 @@ class pc_project:
         pcl_z = pcl_xyz[:, 2]
         pcl_xyz = pcl_xyz / (pcl_xyz[:, 2, None] + 1e-10)
         pcl_uv = pcl_xyz[:, :2]
+        if flag:
+            temp = pcl_uv.copy()
+            temp = temp + np.absolute(np.min(temp,axis=0))
+            temp = temp.astype(np.uint32)
+            print(np.min(temp,axis=0))
+            my_img = np.zeros((np.max(temp,axis=0)),dtype=np.uint8)
+            my_img[temp[:,1],temp[:,0]] = pcl_z.reshape(-1,1)
+            my_img = ((my_img/np.max(my_img))*255).astype(np.uint8)
+            cv2.imwrite('temp.png',my_img)
+            flag = False
         mask = (pcl_uv[:, 0] > 0) & (pcl_uv[:, 0] < img_shape[1]) & (pcl_uv[:, 1] > 0) & (
             pcl_uv[:, 1] < img_shape[0]) & (pcl_z > 0)
         pcl_uv = pcl_uv[mask]
