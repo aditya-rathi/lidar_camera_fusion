@@ -87,13 +87,13 @@ class lidar_cam:
     def __init__(self):
         tfBuffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(tfBuffer)
-        self.sub1 = rospy.Subscriber("/theia/right_camera/color/image_raw",Image,self.cam_callback)
+        self.sub1 = rospy.Subscriber("/theia/front_camera/color/image_raw",Image,self.cam_callback)
         # self.sub1 = rospy.Subscriber("camera/color/image_raw",Image,self.cam_callback)
-        # self.sub2 = rospy.Subscriber("/theia/os_cloud_node/points",PointCloud2,self.lidar_callback)
-        self.sub2 = rospy.Subscriber("/pc_interpoled",PointCloud2,self.lidar_callback)
+        self.sub2 = rospy.Subscriber("/theia/os_cloud_node/points",PointCloud2,self.lidar_callback)
+        # self.sub2 = rospy.Subscriber("/pc_interpoled",PointCloud2,self.lidar_callback)
         self.image = None
         self.pcl_arr = None
-        self.cam_intrinsic = np.array([[615.3355712890625, 0.0, 333.37738037109375], [0.0, 615.457763671875, 233.50408935546875], [0.0, 0.0, 1.0]])
+        self.cam_intrinsic = np.array([[608.30517578125, 0.0, 333.8341064453125], [0.0, 608.1431884765625, 238.41688537597656], [0.0, 0.0, 1.0]])
         self.to_tensor = transforms.ToTensor()
         self.normalization = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                              std=[0.229, 0.224, 0.225])
@@ -115,21 +115,21 @@ class lidar_cam:
     def main(self):
         input_size = (256, 512)    
     
-        # weights = [
-        #     '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter1.tar',
-        #     '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter2.tar',
-        #     '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter3.tar',
-        #     '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter4.tar',
-        #     '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter5.tar'
-        # ]
-
         weights = [
-            '/home/cerlab-ugv/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter1.tar',
-            '/home/cerlab-ugv/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter2.tar',
-            '/home/cerlab-ugv/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter3.tar',
-            '/home/cerlab-ugv/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter4.tar',
-            '/home/cerlab-ugv/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter5.tar'
+            '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter1.tar',
+            '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter2.tar',
+            '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter3.tar',
+            '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter4.tar',
+            '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter5.tar'
         ]
+
+        # weights = [
+        #     '/home/cerlab-ugv/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter1.tar',
+        #     '/home/cerlab-ugv/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter2.tar',
+        #     '/home/cerlab-ugv/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter3.tar',
+        #     '/home/cerlab-ugv/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter4.tar',
+        #     '/home/cerlab-ugv/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter5.tar'
+        # ]
 
         models = []
 
@@ -155,8 +155,9 @@ class lidar_cam:
         # print(real_shape)
         real_shape = [real_shape[1],real_shape[0],real_shape[2]] #!!Needs verification!!
 
-        RT_INIT = torch.tensor([[0, 1, 0 , 0], [-1, 0, 0, 0],[0, 0, 1, 0],[0, -0.1778, -0.381, 1]],dtype=torch.float).cuda()
-        rotated_point_cloud = rotate_forward(self.pcl_arr, RT_INIT)
+        # RT_INIT = torch.tensor([[1, 0, 0 , 0], [0, 1, 0, 0],[0, 0, 1, 0],[0.2794, 0, -0.381, 1]],dtype=torch.float).cuda()
+        RT_INIT = torch.tensor([[0,-1,0,0], [0,0,-1, -0.435],[1,0,0, -0.324],[0, 0, 0, 1]],dtype=torch.float).cuda()
+        rotated_point_cloud = rotate_back(self.pcl_arr, RT_INIT)
 
         depth_img,_,_ = lidar_project_depth(rotated_point_cloud, self.cam_intrinsic, real_shape)
         # print(depth_img.shape)

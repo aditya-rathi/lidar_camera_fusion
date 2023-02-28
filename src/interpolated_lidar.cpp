@@ -53,12 +53,12 @@ float min_FOV = 0.4;     // en radianes angulo minimo de vista de la camara
 
 /// parametros para convertir nube de puntos en imagen
 float angular_resolution_x =0.5f;
-float angular_resolution_y = 2.1f;
+float angular_resolution_y = 5.625f;
 float max_angle_width= 360.0f;
 float max_angle_height = 180.0f;
 
-float interpol_value = 20.0;
-float ang_x_lidar = 0.6*M_PI/180.0; 
+float interpol_value = 4.0;
+float ang_x_lidar = 0.35*M_PI/180.0; 
 double max_var = 50.0; 
 bool f_pc = true; 
 
@@ -320,7 +320,7 @@ void callback(const PointCloud::ConstPtr& msg_pointCloud)
   P_out->is_dense = true;
   P_out->width = (int) P_out->points.size();
   P_out->height = 1;
-  P_out->header.frame_id = "velodyne";
+  P_out->header.frame_id = "theia/os_sensor";
   pc_pub.publish (P_out);
 
   //auto t2= Clock::now();
@@ -348,19 +348,19 @@ int main(int argc, char** argv)
   // nh.getParam("/max_var", max_var);  
   // nh.getParam("/filter_output_pc", f_pc);
 
-  double maxlen = 100;
-  double minlen = 0.0;
-  double angular_resolution_x = 0.25;
-  double interpol_value = 4;
-  double angular_resolution_y = 5.625;
-  double ang_x_lidar = 0.0;
-  double max_var = 5;
-  bool f_pc = true;
+  // maxlen = 50;
+  // minlen = 0.0;
+  // angular_resolution_x = 0.25;
+  // interpol_value = 4;
+  // angular_resolution_y = 2.05;
+  // ang_x_lidar = 0.0;
+  // max_var = 5;
+  // f_pc = true;
 
 
-  ros::Subscriber sub = nh.subscribe<PointCloud>("/theia/os_cloud_node/points", 10, callback);
+  ros::Subscriber sub = nh.subscribe<PointCloud>("/theia/os_cloud_node/points", 20, callback);
   rangeImage = boost::shared_ptr<pcl::RangeImageSpherical>(new pcl::RangeImageSpherical);
-  pc_pub = nh.advertise<PointCloud> ("/pc_interpoled", 10);  
+  pc_pub = nh.advertise<PointCloud> ("/pc_interpoled", 20);  
 
   ros::spin();
 
