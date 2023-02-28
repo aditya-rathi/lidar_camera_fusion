@@ -10,37 +10,36 @@ import cv2
 from cv_bridge import CvBridge
 import threading
 
-flag = True
-
 class pc_project:
     def __init__(self):
         self.sub1 = rospy.Subscriber("/theia/right_camera/color/image_raw",Image,self.cam_callback)
-        self.sub2 = rospy.Subscriber("/theia/os_cloud_node/points",PointCloud2,self.lidar_callback)
+        # self.sub2 = rospy.Subscriber("/theia/os_cloud_node/points",PointCloud2,self.lidar_callback)
+        self.sub2 = rospy.Subscriber("/pc_interpoled",PointCloud2,self.lidar_callback)
         self.pub1 = rospy.Publisher('/combined_output',Image,queue_size=1)
         self.image = None
         self.pcl_arr = None
         self.cam_intrinsic = np.array([[615.3355712890625, 0.0, 333.37738037109375], [0.0, 615.457763671875, 233.50408935546875], [0.0, 0.0, 1.0]])
         self.RT0 = np.array([[0, 1, 0 , 0], [-1, 0, 0, 0],[0, 0, 1, 0],[0, -0.1778, -0.381, 1]],dtype=np.float32)
-        self.RT1 = np.array([[ 0.9995117 ,  0.02276611,  0.00481033, -0.09313965],
-       [-0.02311707,  0.9472656 ,  0.31982422,  0.88671875],
-       [ 0.00272942, -0.32006836,  0.9472656 , -0.37231445],
+        self.RT1 = np.array([[ 0.9998716 ,  0.01470113,  0.00637655, -0.08953563],
+       [-0.01596598,  0.94791955,  0.31810942,  0.91975397],
+       [-0.00136789, -0.3181704 ,  0.94803256, -0.38666177],
        [ 0.        ,  0.        ,  0.        ,  1.        ]],dtype=np.float32)
-        self.RT2 = np.array([[ 0.99902344, -0.04901123,  0.00145721,  1.1611328 ],
-       [ 0.04898071,  0.99609375, -0.07366943,  0.2409668 ],
-       [ 0.00216103,  0.07366943,  0.9970703 ,  0.37036133],
+        self.RT2 = np.array([[ 0.9988142 ,  0.04083097, -0.02651438,  0.94519514],
+       [-0.04396237,  0.9904223 , -0.13088532, -0.73495257],
+       [ 0.02091626,  0.13189574,  0.9910429 ,  0.2531441 ],
        [ 0.        ,  0.        ,  0.        ,  1.        ]],dtype=np.float32)
-        self.RT3 = np.array([[ 0.99853516,  0.02578735,  0.04266357,  0.20812988],
-       [-0.01991272,  0.99072266, -0.1328125 , -0.15588379],
-       [-0.04571533,  0.13183594,  0.9902344 , -0.42163086],
+        self.RT3 = np.array([[ 0.99684525,  0.07551651, -0.02443159,  0.06042938],
+       [-0.07100637,  0.9860387 ,  0.15061815, -0.28504834],
+       [ 0.03546465, -0.14840819,  0.9882901 , -0.25852   ],
        [ 0.        ,  0.        ,  0.        ,  1.        ]],dtype=np.float32)
-        self.RT4 = np.array([[ 1.        ,  0.01309967, -0.00514984, -0.04016113],
-       [-0.01330566,  0.99902344, -0.04241943,  0.0378418 ],
-       [ 0.00458908,  0.04248047,  0.99902344, -0.07385254],
-       [ 0.        ,  0.        ,  0.        ,  1.        ]],dtype=np.float32)
-        self.RT5 = np.array([[ 1.0000000e+00,  2.0732880e-03,  3.6168098e-04, -1.4400482e-03],
-       [-2.0694733e-03,  1.0000000e+00, -1.1581421e-02,  4.7149658e-02],
-       [-3.8576126e-04,  1.1581421e-02,  1.0000000e+00,  1.9550323e-03],
+        self.RT4 = np.array([[ 9.9992353e-01,  1.2354704e-02,  5.4924353e-04,  2.2395309e-02],
+       [-1.2360910e-02,  9.9706960e-01,  7.5494237e-02, -1.3924729e-02],
+       [ 3.8507479e-04, -7.5495251e-02,  9.9714607e-01, -1.2270541e-01],
        [ 0.0000000e+00,  0.0000000e+00,  0.0000000e+00,  1.0000000e+00]],dtype=np.float32)
+        self.RT5 = np.array([[ 0.9999127 ,  0.01284863, -0.00308773, -0.06315594],
+       [-0.01277232,  0.99964035,  0.02357995, -0.06627456],
+       [ 0.00338959, -0.02353846,  0.9997172 ,  0.04958068],
+       [ 0.        ,  0.        ,  0.        ,  1.        ]],dtype=np.float32)
         self.bridge = CvBridge()
         self.rate = rospy.Rate(30)
         self.lock = threading.Lock()
@@ -69,7 +68,6 @@ class pc_project:
         self.lock.release()
 
     def project_depth(self):
-        global flag
         while self.image is None or self.pcl_arr is None:
             rospy.sleep(0.1)
         img_shape = self.image.shape
@@ -80,16 +78,6 @@ class pc_project:
         pcl_z = pcl_xyz[:, 2]
         pcl_xyz = pcl_xyz / (pcl_xyz[:, 2, None] + 1e-10)
         pcl_uv = pcl_xyz[:, :2]
-        if flag:
-            temp = pcl_uv.copy()
-            temp = temp + np.absolute(np.min(temp,axis=0))
-            temp = temp.astype(np.uint32)
-            print(np.min(temp,axis=0))
-            my_img = np.zeros((np.max(temp,axis=0)),dtype=np.uint8)
-            my_img[temp[:,1],temp[:,0]] = pcl_z.reshape(-1,1)
-            my_img = ((my_img/np.max(my_img))*255).astype(np.uint8)
-            cv2.imwrite('temp.png',my_img)
-            flag = False
         mask = (pcl_uv[:, 0] > 0) & (pcl_uv[:, 0] < img_shape[1]) & (pcl_uv[:, 1] > 0) & (
             pcl_uv[:, 1] < img_shape[0]) & (pcl_z > 0)
         pcl_uv = pcl_uv[mask]
