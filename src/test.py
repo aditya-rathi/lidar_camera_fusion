@@ -88,7 +88,8 @@ class lidar_cam:
     
     def cam_callback(self,data):
         data = ros_numpy.numpify(data)
-        self.image = im.fromarray(data)
+        self.image = data
+        # self.image = im.fromarray(data)
         self.sub1.unregister()
  
     def lidar_callback(self,data):
@@ -119,7 +120,7 @@ class lidar_cam:
         # ]
 
         weights = [
-            # '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/lccnet_finetune_1.pth',
+            '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/lccnet_finetune_1.pth',
             '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/lccnet_finetune_2.pth',
             '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/lccnet_finetune_3.pth',
             '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/lccnet_finetune_4.pth',
@@ -140,26 +141,23 @@ class lidar_cam:
             model.eval()
             models.append(model)
 
-        while(self.image==None or self.pcl_arr==None):
+        while(np.all(self.image)==None or self.pcl_arr==None):
             print("waiting")
-            rospy.sleep(1)
-        # print(self.image)
+            rospy.sleep(1) 
         
-
-        # print(self.image)
         real_shape = np.array(self.image).shape
-        # print(real_shape)
 
-        RT_INIT = torch.tensor([[0,-1,0,0], [0,0,-1, -0.435],[1,0,0, -0.324],[0, 0, 0, 1]],dtype=torch.float).cuda()
+        # RT_INIT = torch.tensor([[0,-1,0,0], [0,0,-1, -0.435],[1,0,0, -0.324],[0, 0, 0, 1]],dtype=torch.float).cuda()
+        RT_INIT = torch.tensor([[0,-0.8,0,0], [0,0,-1, -0.435],[1,0,0, -0.324],[0, 0, 0, 1]],dtype=torch.float).cuda()
         # RT_INIT = torch.tensor([[0,-1,0,0], [0,0,-1, 0],[1,0,0, 0],[0, 0, 0, 1]],dtype=torch.float).cuda()
         rotated_point_cloud = rotate_back(self.pcl_arr, RT_INIT)
 
         depth_img,_,_ = lidar_project_depth(rotated_point_cloud, self.cam_intrinsic, real_shape)
         # print(depth_img.shape)
         depth_img = torch.unsqueeze(depth_img,0)
-        # depth_img = depth_img.detach().cpu().numpy()
-        # depth_img = (depth_img / np.max(depth_img)) * 255
-        self.image.save('rgb.png')
+
+        # self.image.save('rgb.png')
+        
         self.image = self.to_tensor(self.image)
         self.image = self.normalization(self.image)
         self.image = torch.unsqueeze(self.image,0)
@@ -182,29 +180,29 @@ class lidar_cam:
                 depth_img = torch.unsqueeze(depth_img,dim=0)
             # 
 
-        depth_img = F.interpolate(depth_img, size=[256, 512], mode="bilinear")
-        depth_img = depth_img.squeeze()
+        # depth_img = F.interpolate(depth_img, size=[256, 512], mode="bilinear")
+        # depth_img = depth_img.squeeze()
         
-        depth_img = depth_img.detach().cpu().numpy()
-        depth_img = ((depth_img / np.max(depth_img)) * 255)
-        # depth_img = cv2.applyColorMap(depth_img,cv2.COLORMAP_JET)
-        depth_img = im.fromarray(depth_img)
-        depth_img = depth_img.convert('RGB')
-        depth_img.save('final_depth.png')
+        # depth_img = depth_img.detach().cpu().numpy()
+        # depth_img = ((depth_img / np.max(depth_img)) * 255)
+        # # depth_img = cv2.applyColorMap(depth_img,cv2.COLORMAP_JET)
+        # depth_img = im.fromarray(depth_img)
+        # depth_img = depth_img.convert('RGB')
+        # depth_img.save('final_depth.png')
 
         
         
-        pcl_pred = o3.geometry.PointCloud()
-        rotated_point_cloud = (rotated_point_cloud.T).detach().cpu().numpy()
+        # pcl_pred = o3.geometry.PointCloud()
+        # rotated_point_cloud = (rotated_point_cloud.T).detach().cpu().numpy()
 
-        color_arr_0 = np.hstack((np.zeros((rotated_point_cloud.shape[0],2),dtype=np.float64),np.ones((rotated_point_cloud.shape[0],1),dtype=np.float64)))
-        color_arr_1 = np.hstack((np.ones((rotated_point_cloud.shape[0],1),dtype=np.float64),np.zeros((rotated_point_cloud.shape[0],2),dtype=np.float64)))
-        points_arr = np.concatenate((self.pcl_arr.cpu().numpy().T,rotated_point_cloud))
-        color_arr = np.concatenate((color_arr_0,color_arr_1))
+        # color_arr_0 = np.hstack((np.zeros((rotated_point_cloud.shape[0],2),dtype=np.float64),np.ones((rotated_point_cloud.shape[0],1),dtype=np.float64)))
+        # color_arr_1 = np.hstack((np.ones((rotated_point_cloud.shape[0],1),dtype=np.float64),np.zeros((rotated_point_cloud.shape[0],2),dtype=np.float64)))
+        # points_arr = np.concatenate((self.pcl_arr.cpu().numpy().T,rotated_point_cloud))
+        # color_arr = np.concatenate((color_arr_0,color_arr_1))
         
-        pcl_pred.points = o3.utility.Vector3dVector(points_arr[:, :3])
-        pcl_pred.colors = o3.utility.Vector3dVector(color_arr)
-        o3.io.write_point_cloud('test.pcd',pcl_pred)
+        # pcl_pred.points = o3.utility.Vector3dVector(points_arr[:, :3])
+        # pcl_pred.colors = o3.utility.Vector3dVector(color_arr)
+        # o3.io.write_point_cloud('test.pcd',pcl_pred)
         
         print(RTs)
 
