@@ -1,0 +1,10 @@
+Metadata-Version: 1.2
+Name: mathutils
+Version: 3.3.0
+Summary: A general math utilities library providing Matrix, Vector, Quaternion, Euler and Color classes, written in C for speed.
+Home-page: https://gitlab.com/ideasman42/blender-mathutils
+Maintainer: Campbell Barton
+Maintainer-email: ideasman42@gmail.com
+License: GNU GPLv3+
+Description: UNKNOWN
+Platform: UNKNOWN
