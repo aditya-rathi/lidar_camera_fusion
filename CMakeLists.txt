@@ -172,6 +172,12 @@ target_link_libraries(interpolated_node
    ${Boost_LIBRARIES}
 )
 
+add_executable(data_saver  src/data_saver.cpp)
+target_link_libraries(data_saver
+   ${catkin_LIBRARIES}
+   ${PCL_LIBRARIES}
+   ${OpenCV_LIBRARIES}
+)
 
 #############
 ## Install ##

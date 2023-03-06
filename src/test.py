@@ -42,7 +42,6 @@ def get_2D_lidar_projection(pcl, cam_intrinsic):
     pcl_z = pcl_xyz[:, 2]
     pcl_xyz = pcl_xyz / (pcl_xyz[:, 2, None] + 1e-10)
     pcl_uv = pcl_xyz[:, :2]
-    print(pcl_uv.shape)
 
     return pcl_uv, pcl_z
 
@@ -50,24 +49,7 @@ def get_2D_lidar_projection(pcl, cam_intrinsic):
 def lidar_project_depth(pc_rotated, cam_calib, img_shape):
     pc_rotated = pc_rotated[:3, :].detach().cpu().numpy()
     cam_intrinsic = cam_calib
-    pcl_uv, pcl_z = get_2D_lidar_projection(pc_rotated.T, cam_intrinsic)
-
-    temp = pcl_uv.copy()
-    temp_z = pcl_z.copy()
-    print(np.min(temp,axis=0))
-    # temp = temp + np.absolute(np.min(temp,axis=0))
-    temp = temp.astype(np.uint32)
-    my_img = np.zeros((1000,1000),dtype=np.uint8)
-    mask = (temp[:, 0] > 0) & (temp[:, 0] < 1000) & (temp[:, 1] > 0) & (
-            temp[:, 1] < 1000) & (pcl_z > 0)
-    temp = temp[mask].astype(np.uint32)
-    temp_z = temp_z[mask]
-    my_img[temp[:,1],temp[:,0]] = temp_z
-    my_img = ((my_img/(np.max(my_img)+1e-10))*255).astype(np.uint8)
-    cv2.namedWindow('temp',cv2.WINDOW_NORMAL)
-    cv2.imshow('temp',my_img)
-    cv2.waitKey(0)
-    
+    pcl_uv, pcl_z = get_2D_lidar_projection(pc_rotated.T, cam_intrinsic)    
     mask = (pcl_uv[:, 0] > 0) & (pcl_uv[:, 0] < img_shape[1]) & (pcl_uv[:, 1] > 0) & (
             pcl_uv[:, 1] < img_shape[0]) & (pcl_z > 0)
     pcl_uv = pcl_uv[mask]
@@ -76,6 +58,11 @@ def lidar_project_depth(pc_rotated, cam_calib, img_shape):
     pcl_z = pcl_z.reshape(-1, 1)
     depth_img = np.zeros((img_shape[0], img_shape[1], 1))
     depth_img[pcl_uv[:, 1], pcl_uv[:, 0]] = pcl_z
+
+    cv2.namedWindow('temp',cv2.WINDOW_NORMAL)
+    cv2.imshow('temp',depth_img)
+    cv2.waitKey(0)
+
     depth_img = torch.from_numpy(depth_img.astype(np.float32))
     depth_img = depth_img.cuda()
     depth_img = depth_img.permute(2, 0, 1)
@@ -115,13 +102,13 @@ class lidar_cam:
     def main(self):
         input_size = (256, 512)    
     
-        weights = [
-            '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter1.tar',
-            '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter2.tar',
-            '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter3.tar',
-            '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter4.tar',
-            '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter5.tar'
-        ]
+        # weights = [
+        #     '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter1.tar',
+        #     '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter2.tar',
+        #     '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter3.tar',
+        #     '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter4.tar',
+        #     '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter5.tar'
+        # ]
 
         # weights = [
         #     '/home/cerlab-ugv/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter1.tar',
@@ -131,6 +118,14 @@ class lidar_cam:
         #     '/home/cerlab-ugv/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/kitti_iter5.tar'
         # ]
 
+        weights = [
+            # '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/lccnet_finetune_1.pth',
+            '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/lccnet_finetune_2.pth',
+            '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/lccnet_finetune_3.pth',
+            '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/lccnet_finetune_4.pth',
+            '/home/cerlab/submodule_ws/src/lidar_camera_fusion/include/lidar_camera_fusion/pretrained/lccnet_finetune_5.pth'
+        ]
+
         models = []
 
         for i in range(len(weights)):
@@ -138,8 +133,9 @@ class lidar_cam:
             model = LCCNet(input_size, use_feat_from=1, md=4,
                                 use_reflectance=False, dropout=0.0)
             checkpoint = torch.load(weights[i], map_location='cpu')
-            saved_state_dict = checkpoint['state_dict']
-            model.load_state_dict(saved_state_dict)
+            # saved_state_dict = checkpoint['state_dict']
+            # model.load_state_dict(saved_state_dict)
+            model.load_state_dict(checkpoint)
             model = model.to(device)
             model.eval()
             models.append(model)
@@ -153,10 +149,9 @@ class lidar_cam:
         # print(self.image)
         real_shape = np.array(self.image).shape
         # print(real_shape)
-        real_shape = [real_shape[1],real_shape[0],real_shape[2]] #!!Needs verification!!
 
-        # RT_INIT = torch.tensor([[1, 0, 0 , 0], [0, 1, 0, 0],[0, 0, 1, 0],[0.2794, 0, -0.381, 1]],dtype=torch.float).cuda()
         RT_INIT = torch.tensor([[0,-1,0,0], [0,0,-1, -0.435],[1,0,0, -0.324],[0, 0, 0, 1]],dtype=torch.float).cuda()
+        # RT_INIT = torch.tensor([[0,-1,0,0], [0,0,-1, 0],[1,0,0, 0],[0, 0, 0, 1]],dtype=torch.float).cuda()
         rotated_point_cloud = rotate_back(self.pcl_arr, RT_INIT)
 
         depth_img,_,_ = lidar_project_depth(rotated_point_cloud, self.cam_intrinsic, real_shape)
@@ -186,10 +181,7 @@ class lidar_cam:
                 depth_img,_,_ = lidar_project_depth(rotated_point_cloud, self.cam_intrinsic, real_shape)
                 depth_img = torch.unsqueeze(depth_img,dim=0)
             # 
-        combined = overlay_imgs(self.image[0],depth_img)
-        combined = combined.astype(np.uint8)
-        print(combined)
-        cv2.imwrite('combined.png',combined)
+
         depth_img = F.interpolate(depth_img, size=[256, 512], mode="bilinear")
         depth_img = depth_img.squeeze()
         
@@ -215,6 +207,11 @@ class lidar_cam:
         o3.io.write_point_cloud('test.pcd',pcl_pred)
         
         print(RTs)
+
+        for i in range(len(RTs)):
+            f_name = "./src/lidar_camera_fusion/cfg/RT_%d.csv"%i
+            np.savetxt(f_name,RTs[i],delimiter=',')
+
 
 
 
