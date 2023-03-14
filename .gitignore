@@ -20,3 +20,5 @@ include/lccnet_models/correlation_package/correlation_cuda.cpython-38-x86_64-lin
 include/lccnet_models/correlation_package/build/temp.linux-x86_64-3.8/
 
 include/lccnet_models/correlation_package/build/lib.linux-x86_64-3.8/correlation_cuda.cpython-38-x86_64-linux-gnu.so
+
+include/lidar_camera_fusion/finetuned_models/
